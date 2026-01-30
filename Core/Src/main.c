@@ -43,6 +43,7 @@
 #include "bsp_oled.h"
 #include "bsp_adc.h"
 #include "bsp_imu.h"
+#include "bsp_LC307.h"
 
 /* USER CODE END Includes */
 
@@ -64,7 +65,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t uart1_recv,uart3_recv;
+uint8_t uart1_recv,uart4_recv;
 float g_userparam_pitchzero = 0 , g_userparam_rollzero = 0;
 DebugShowVal_t g_debugVal = { 0 };
 /* USER CODE END PV */
@@ -112,7 +113,6 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_USART1_UART_Init();
-  MX_USART3_UART_Init();
   MX_USART2_UART_Init();
   MX_TIM6_Init();
   MX_TIM8_Init();
@@ -120,13 +120,14 @@ int main(void)
   MX_ADC1_Init();
   MX_UART5_Init();
   MX_UART4_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 	
 	pOLEDInterface_t oled = &UserOLED;
 	oled->init();
 	
 	//蓝牙、调试串口
-	HAL_UART_Receive_IT(&huart3,&uart3_recv,1);
+	HAL_UART_Receive_IT(&huart4,&uart4_recv,1);
 	HAL_UART_Receive_IT(&huart1,&uart1_recv,1);
 	
 	//用户调试定时器
@@ -175,6 +176,9 @@ int main(void)
   }
   imu_initled -> on();//初始化完成,亮灯提示
 
+  //光流模块初始化
+  Opf_LC307_Init();
+  
   //读取用户设定的零点数据
   extern void User_Flash_ReadParam(uint32_t* p,uint16_t datalen);
   int32_t tmp[2] = { 0 } ;
@@ -256,7 +260,7 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-UART_HandleTypeDef *DebugSerial = &huart3;
+UART_HandleTypeDef *DebugSerial = &huart1;
 
 //实现printf、scanf函数
 int fputc(int ch,FILE* stream)

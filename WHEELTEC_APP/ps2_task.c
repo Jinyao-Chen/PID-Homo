@@ -3,6 +3,7 @@
 
 #include "FreeRTOS.h"
 #include "queue.h"
+#include "event_groups.h"
 
 #include "balance_task.h"
 
@@ -23,6 +24,9 @@ extern void TestMotorMode_TestA(uint8_t operateNum);
 extern void TestMotorMode_TestB(uint8_t operateNum);
 extern void TestMotorMode_TestC(uint8_t operateNum);
 extern void TestMotorMode_TestD(uint8_t operateNum);
+
+extern void set_targetpos_lc307(uint8_t flag);
+extern void start_lc307_pos(void);
 
 //系统复位
 void ResetSystem(uint8_t isFromISR);
@@ -49,6 +53,9 @@ void USBH_HID_EventCallback(USBH_HandleTypeDef *phost)
 	FlyControlType_t controlVal = { 0 };//定义控制量
 	
 	PS2KEY_State_t ps2_keystate = PS2KEYSTATE_NONE;
+	
+	extern EventGroupHandle_t g_xEventFlyAction; //四轴动作事件组
+	EventBits_t uxBits = xEventGroupGetBits(g_xEventFlyAction);
 	
 	//start按键
 	ps2_keystate = ps2->getKeyEvent(PS2KEY_START);
@@ -118,37 +125,67 @@ void USBH_HID_EventCallback(USBH_HandleTypeDef *phost)
 		FlyAction_TestMotorMode();
 	
 	//电机测试模式下,右盘按键可对电机进行正反转的设置与测试
-	ps2_keystate = ps2->getKeyEvent(PS2KEY_1GREEN);
-	if( PS2KEYSTATE_SINGLECLICK == ps2_keystate )
-		TestMotorMode_TestA(0); //测试电机转动
-	else if( PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
-		TestMotorMode_TestA(1); //修改电机方向
-	else if( PS2KEYSTATE_LONGCLICK == ps2_keystate )
-		TestMotorMode_TestA(2); //保存修改
-	
-	ps2_keystate = ps2->getKeyEvent(PS2KEY_2RED);
-	if( PS2KEYSTATE_SINGLECLICK == ps2_keystate )
-		TestMotorMode_TestB(0); //测试电机转动
-	else if( PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
-		TestMotorMode_TestB(1); //修改电机方向
-	else if( PS2KEYSTATE_LONGCLICK == ps2_keystate )
-		TestMotorMode_TestB(2); //保存修改
-	
-	ps2_keystate = ps2->getKeyEvent(PS2KEY_3BLUE);
-	if( PS2KEYSTATE_SINGLECLICK == ps2_keystate )
-		TestMotorMode_TestC(0); //测试电机转动
-	else if( PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
-		TestMotorMode_TestC(1); //修改电机方向
-	else if( PS2KEYSTATE_LONGCLICK == ps2_keystate )
-		TestMotorMode_TestC(2); //保存修改
-	
-	ps2_keystate = ps2->getKeyEvent(PS2KEY_4PINK);
-	if( PS2KEYSTATE_SINGLECLICK == ps2_keystate )
-		TestMotorMode_TestD(0); //测试电机转动
-	else if( PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
-		TestMotorMode_TestD(1); //修改电机方向
-	else if( PS2KEYSTATE_LONGCLICK == ps2_keystate )
-		TestMotorMode_TestD(2); //保存修改
+	if( uxBits&StartFly_Event )
+	{
+		ps2_keystate = ps2->getKeyEvent(PS2KEY_1GREEN);
+		if( PS2KEYSTATE_SINGLECLICK == ps2_keystate || PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
+		{
+			set_targetpos_lc307(2);
+		}
+		
+		ps2_keystate = ps2->getKeyEvent(PS2KEY_2RED);
+		if( PS2KEYSTATE_SINGLECLICK == ps2_keystate || PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
+		{
+			set_targetpos_lc307(0);
+		}
+		
+		ps2_keystate = ps2->getKeyEvent(PS2KEY_3BLUE);
+		if( PS2KEYSTATE_SINGLECLICK == ps2_keystate || PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
+		{
+			set_targetpos_lc307(3);
+		}
+		
+		ps2_keystate = ps2->getKeyEvent(PS2KEY_4PINK);
+		if( PS2KEYSTATE_SINGLECLICK == ps2_keystate || PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
+		{
+			set_targetpos_lc307(1);
+		}
+	}
+	else
+	{
+		ps2_keystate = ps2->getKeyEvent(PS2KEY_1GREEN);
+		if( PS2KEYSTATE_SINGLECLICK == ps2_keystate )
+			TestMotorMode_TestA(0); //测试电机转动
+		else if( PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
+			TestMotorMode_TestA(1); //修改电机方向
+		else if( PS2KEYSTATE_LONGCLICK == ps2_keystate )
+			TestMotorMode_TestA(2); //保存修改
+		
+		ps2_keystate = ps2->getKeyEvent(PS2KEY_2RED);
+		if( PS2KEYSTATE_SINGLECLICK == ps2_keystate )
+			TestMotorMode_TestB(0); //测试电机转动
+		else if( PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
+			TestMotorMode_TestB(1); //修改电机方向
+		else if( PS2KEYSTATE_LONGCLICK == ps2_keystate )
+			TestMotorMode_TestB(2); //保存修改
+		
+		ps2_keystate = ps2->getKeyEvent(PS2KEY_3BLUE);
+		if( PS2KEYSTATE_SINGLECLICK == ps2_keystate )
+			TestMotorMode_TestC(0); //测试电机转动
+		else if( PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
+			TestMotorMode_TestC(1); //修改电机方向
+		else if( PS2KEYSTATE_LONGCLICK == ps2_keystate )
+			TestMotorMode_TestC(2); //保存修改
+		
+		ps2_keystate = ps2->getKeyEvent(PS2KEY_4PINK);
+		if( PS2KEYSTATE_SINGLECLICK == ps2_keystate )
+			TestMotorMode_TestD(0); //测试电机转动
+		else if( PS2KEYSTATE_DOUBLECLICK == ps2_keystate )
+			TestMotorMode_TestD(1); //修改电机方向
+		else if( PS2KEYSTATE_LONGCLICK == ps2_keystate )
+			TestMotorMode_TestD(2); //保存修改
+	}
+
 	
 	//检查是否需要写入控制队列的变量
 	uint8_t WriteFlag = 0;
@@ -173,7 +210,7 @@ void USBH_HID_EventCallback(USBH_HandleTypeDef *phost)
 	}
 	
 	//控制速度
-	static float control_step = 5.0f;
+	static float control_step = 10.0f;
 	
 	//右上扳机长按，高速档与低速档的切换
 	ps2_keystate = ps2->getKeyEvent(PS2KEY_R1);
@@ -183,9 +220,7 @@ void USBH_HID_EventCallback(USBH_HandleTypeDef *phost)
 		flag = !flag;
 		BeepTips();
 		
-		//高速档与低速档切换
-		if( 1 == flag ) control_step = 7.0f;
-		else control_step = 5.0f;
+		start_lc307_pos();
 	}
 	
 	//右手油门
@@ -212,8 +247,8 @@ void USBH_HID_EventCallback(USBH_HandleTypeDef *phost)
 		else controlVal.height = 0 , WriteFlag++;
 		
 		//右手摇杆X轴 -- 控制旋转
-		if( ps2->RX<=5 ) controlVal.gyroz = -angle_to_rad(60.0f);
-		else if( ps2->RX > 250 ) controlVal.gyroz = angle_to_rad(60.0f);
+		if( ps2->RX<=5 ) controlVal.gyroz = -angle_to_rad(1.0f);
+		else if( ps2->RX > 250 ) controlVal.gyroz = angle_to_rad(1.0f);
 		else controlVal.gyroz = 0 , WriteFlag++;
 	}
 	
@@ -232,8 +267,8 @@ void USBH_HID_EventCallback(USBH_HandleTypeDef *phost)
 		else if( ps2->LY>250 ) controlVal.height = -0.003f;
 		else controlVal.height = 0 , WriteFlag++;
 		
-		if( ps2->LX<=5 ) controlVal.gyroz = -angle_to_rad(60.0f);
-		else if( ps2->LX > 250 ) controlVal.gyroz = angle_to_rad(60.0f);
+		if( ps2->LX<=5 ) controlVal.gyroz = -angle_to_rad(1.0f);
+		else if( ps2->LX > 250 ) controlVal.gyroz = angle_to_rad(1.0f);
 		else controlVal.gyroz = 0 , WriteFlag++;
 	}
 

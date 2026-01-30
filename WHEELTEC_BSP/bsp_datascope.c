@@ -121,7 +121,7 @@ static void DataScope_Get_Channel_Data(float Data,unsigned char Channel)
 }
 
 //波形显示使用的串口
-UART_HandleTypeDef* DataScope_Seiral = &huart3;
+UART_HandleTypeDef* DataScope_Seiral = &huart4;
 
 static void DataScope_ShowData(float* showdata,uint8_t showlen)
 {

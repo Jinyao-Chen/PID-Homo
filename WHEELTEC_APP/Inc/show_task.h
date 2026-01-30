@@ -10,18 +10,29 @@ typedef struct{
 	float gyrox;
 	float gyroy;
 	float gyroz;
+	float accelx;
+	float accely;
+	float accelz;
 	float m1;
 	float m2;
 	float m3;
 	float m4;
 	float balanceTaskFreq;
 	float height;
+	float spa06Height;
+	float spa06NofilterHeight;
 	float c_roll;
 	float c_pitch;
 	float c_yaw;
 	float c_height;
-	short posx;
-	short posy;
+	float posx;
+	float posy;
+	float speedx;
+	float speedy;
+	float zero_roll;
+	float zero_pitch;
+	float targetX;
+	float targetY;
 }APPShowType_t;
 
 #endif

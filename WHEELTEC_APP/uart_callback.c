@@ -10,6 +10,7 @@
 #include "bsp_buzzer.h"
 #include "bsp_stp23L.h"
 #include "bsp_N10.h"
+#include "bsp_LC307.h"
 
 #include "balance_task.h"
 static void _System_Reset_(uint8_t uart_recv)
@@ -58,16 +59,16 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	
-	if( huart == &huart3 ) //蓝牙使用的串口
+	if( huart == &huart4 ) //蓝牙使用的串口
 	{
 		//复位BootLoadr检测指令
-		_System_Reset_(uart3_recv);
+		_System_Reset_(uart4_recv);
 		
 		/* APP写入指令 */
 		extern QueueHandle_t g_xQueueBlueTooth_Ori;
-		xQueueSendFromISR(g_xQueueBlueTooth_Ori,&uart3_recv,&xHigherPriorityTaskWoken);
+		xQueueSendFromISR(g_xQueueBlueTooth_Ori,&uart4_recv,&xHigherPriorityTaskWoken);
 		
-		HAL_UART_Receive_IT(&huart3,&uart3_recv,1);
+		HAL_UART_Receive_IT(&huart4,&uart4_recv,1);
 	}
 	else if( huart == &huart1 )
 	{
@@ -138,6 +139,15 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 			/* 重新使能DMA开启下一次数据的传输 */
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart2,DMABuf_oridata_N10.Buf,userconfig_N10_DMABUF_LEN);
 		}
+	}
+	//光流模块数据
+	else if(  huart == &huart3 )
+	{
+		if( HAL_UART_STATE_READY == huart->RxState )
+		{
+			LC307_Callback(Size);
+		}
+		
 	}
 	else if( huart == &huart4 )
 	{

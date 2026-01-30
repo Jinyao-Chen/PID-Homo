@@ -12,7 +12,7 @@
 
 static uint8_t ICM20948_Init(void)
 {
-	pIICInterface_t iicdev = &UserII2Dev;//初始化iic设备
+	pIICInterface_t iicdev = &UserIICDev;//初始化iic设备
 	
 	IIC_Status_t check_state = IIC_OK;//检查初始化步骤是否出错
 	
@@ -106,7 +106,7 @@ static uint8_t ICM20948_Init(void)
 
 static uint8_t ICM20948_DeInit(void)
 {
-	pIICInterface_t iicdev = &UserII2Dev;//初始化iic设备
+	pIICInterface_t iicdev = &UserIICDev;//初始化iic设备
 	
 	IIC_Status_t check_state = IIC_OK;//检查初始化步骤是否出错
 	
@@ -137,7 +137,7 @@ static ATTITUDE_DATA_t ZeroAttitude = { 0 };
 
 static void ImuUpdate(IMU_DATA_t *data)
 {
-	pIICInterface_t iicdev = &UserII2Dev;//指定iic设备
+	pIICInterface_t iicdev = &UserIICDev;//指定iic设备
 	
 	//获得6轴的数据原始值
 	uint8_t tmpbuf[12];
@@ -159,9 +159,9 @@ static void ImuUpdate(IMU_DATA_t *data)
 //	data->accel.z = 0.9926f * data->accel.z + 0.0506f;
 	
 	//去除零点漂移
-//	data->accel.x -= ZeroPoint.accel.x;
-//	data->accel.y -= ZeroPoint.accel.y;
-//	data->accel.z -= ZeroPoint.accel.z;
+	data->accel.x -= ZeroPoint.accel.x;
+	data->accel.y -= ZeroPoint.accel.y;
+	data->accel.z -= ZeroPoint.accel.z;
 	
 	//获得角速度3轴原始值
 	data->gyro.x = (short)(tmpbuf[6]<<8 | tmpbuf[7]);
@@ -176,9 +176,6 @@ static void ImuUpdate(IMU_DATA_t *data)
 	data->gyro.x *= 0.01745329252f;//单位rad/s
 	data->gyro.y *= 0.01745329252f;
 	data->gyro.z *= 0.01745329252f;
-	
-	
-	if( fabs(data->gyro.z) < 0.05f ) data->gyro.z = 0;
 	
 	//去除零点漂移
 	data->gyro.x -= ZeroPoint.gyro.x; 

@@ -23,7 +23,7 @@ typedef struct {
 	void (*delay_ms)(uint16_t ms);
 }IICInterface_t,*pIICInterface_t;
 
-extern IICInterface_t UserII2Dev;
+extern IICInterface_t UserIICDev;
 
 
 #endif /* __BSP_IIC_H */

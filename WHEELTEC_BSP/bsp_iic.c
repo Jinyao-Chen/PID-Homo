@@ -66,7 +66,7 @@ static void iic_delayms(uint16_t ms)
 	
 
 //¹ÒÔØÇý¶¯
-IICInterface_t UserII2Dev = {
+IICInterface_t UserIICDev = {
 	.write = iic_write , 
 	.read = iic_read ,
 	.write_reg = iic_write_reg ,

@@ -65,18 +65,16 @@ void Error_Handler(void);
 #define OLED_RES_GPIO_Port GPIOC
 #define OLED_DC_Pin GPIO_PIN_0
 #define OLED_DC_GPIO_Port GPIOC
-#define Battery_CH_Pin GPIO_PIN_1
-#define Battery_CH_GPIO_Port GPIOA
 #define Lidar_TX_Pin GPIO_PIN_2
 #define Lidar_TX_GPIO_Port GPIOA
 #define Lidar_RX_Pin GPIO_PIN_3
 #define Lidar_RX_GPIO_Port GPIOA
 #define User_BUZZER_Pin GPIO_PIN_4
 #define User_BUZZER_GPIO_Port GPIOA
-#define BT_TX_Pin GPIO_PIN_10
-#define BT_TX_GPIO_Port GPIOB
-#define BT_RX_Pin GPIO_PIN_11
-#define BT_RX_GPIO_Port GPIOB
+#define Battery_Ch_Pin GPIO_PIN_7
+#define Battery_Ch_GPIO_Port GPIOA
+#define cur_ch_Pin GPIO_PIN_1
+#define cur_ch_GPIO_Port GPIOB
 #define IMU_INT_Pin GPIO_PIN_12
 #define IMU_INT_GPIO_Port GPIOB
 #define IMU_INT_EXTI_IRQn EXTI15_10_IRQn
@@ -90,6 +88,10 @@ void Error_Handler(void);
 #define DEBUG_TX_GPIO_Port GPIOA
 #define DEBUG_RX_Pin GPIO_PIN_10
 #define DEBUG_RX_GPIO_Port GPIOA
+#define BT_TX_Pin GPIO_PIN_10
+#define BT_TX_GPIO_Port GPIOC
+#define BT_RX_Pin GPIO_PIN_11
+#define BT_RX_GPIO_Port GPIOC
 #define STP23L_TX_Pin GPIO_PIN_12
 #define STP23L_TX_GPIO_Port GPIOC
 #define STP23L_RX_Pin GPIO_PIN_2
@@ -97,7 +99,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 
-extern uint8_t uart1_recv,uart3_recv;
+extern uint8_t uart1_recv,uart4_recv;
 
 typedef struct{
 	float f1;

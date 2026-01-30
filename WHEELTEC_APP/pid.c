@@ -11,132 +11,49 @@ void PID_Reset(PIDControllerType_t* pid)
 	pid->derivative = 0;
 }
 
-void PIDIncremental_Reset(PIDIncrementalType_t* pid)
-{
-	pid->prev_error = 0;
-	pid->output = 0;
-}
-
-void PID_UpdatePitch(PIDControllerType_t* pid,float target,float current,float pitchrate)
-{
-	float error = target - current; //本次误差
-	
-	//积分因子
-	float integral_factor = (fabs(error) < pid->IntegralThreshold) ? 1.0f : (pid->IntegralThreshold / fabs(error));
-	pid->intergral += integral_factor  * error;
-	
-
-	//微分项,采用一阶低通滤波
-	float Tmpderivative = pitchrate;
-	pid->derivative = pid->alpha*Tmpderivative + (1.0f-pid->alpha)*pid->derivative;
-	
-	//pid输出
-	pid->output = pid->kp * error + pid->ki * pid->intergral - pid->kd*pid->derivative;
-	
-	//输出限幅
-	if( pid->output > pid->LimitOutputMax ) 
-	{
-		pid->output = pid->LimitOutputMax;
-		if( error>0 ) pid->intergral *= 0.9f; // 轻微减少积分项，防止累积过多
-	}
-	if( pid->output < pid->LimitOutputMin ) 
-	{
-		pid->output = pid->LimitOutputMin;
-		if( error<0 ) pid->intergral *= 0.9f; // 轻微减少积分项，防止累积过多
-	}
-	
-	//积分限幅
-	if( pid->intergral>pid->LimitIntegralMax ) pid->intergral = pid->LimitIntegralMax;
-	if( pid->intergral<pid->LimitIntegralMin ) pid->intergral = pid->LimitIntegralMin;
-}
-
-void PID_UpdateRoll(PIDControllerType_t* pid,float target,float current,float rollrate)
-{
-	float error = target - current; //本次误差
-	
-	//积分因子
-	float integral_factor = (fabs(error) < pid->IntegralThreshold) ? 1.0f : (pid->IntegralThreshold / fabs(error));
-	pid->intergral += integral_factor  * error;
-	
-
-	//微分项,采用一阶低通滤波
-	float Tmpderivative = rollrate;
-	pid->derivative = pid->alpha*Tmpderivative + (1.0f-pid->alpha)*pid->derivative;
-	
-	//pid输出
-	pid->output = pid->kp * error + pid->ki * pid->intergral - pid->kd*pid->derivative;
-	
-	//输出限幅
-	if( pid->output > pid->LimitOutputMax ) 
-	{
-		pid->output = pid->LimitOutputMax;
-		if( error>0 ) pid->intergral *= 0.9f; // 轻微减少积分项，防止累积过多
-	}
-	if( pid->output < pid->LimitOutputMin ) 
-	{
-		pid->output = pid->LimitOutputMin;
-		if( error<0 ) pid->intergral *= 0.9f; // 轻微减少积分项，防止累积过多
-	}
-	
-	//积分限幅
-	if( pid->intergral>pid->LimitIntegralMax ) pid->intergral = pid->LimitIntegralMax;
-	if( pid->intergral<pid->LimitIntegralMin ) pid->intergral = pid->LimitIntegralMin;
-}
-
 //PID更新函数
 void PID_Update(PIDControllerType_t* pid,float target,float current)
 {
 	
 	float error = target - current; //本次误差
 	
-	//积分因子
-	float integral_factor = (fabs(error) < pid->IntegralThreshold) ? 1.0f : (pid->IntegralThreshold / fabs(error));
-	pid->intergral += integral_factor  * error;
+//	//积分因子
+//	float integral_factor = (fabs(error) < pid->IntegralThreshold) ? 1.0f : (pid->IntegralThreshold / fabs(error));
+//	pid->intergral += integral_factor  * error;
 	
-
+	if( fabs(error) < pid->IntegralThreshold ) pid->intergral += error;
+	
 	//微分项,采用一阶低通滤波
 	float Tmpderivative = (error - pid->prev_error);
 	pid->derivative = pid->alpha*Tmpderivative + (1.0f-pid->alpha)*pid->derivative;
 	pid->prev_error = error;
 	
-	//pid输出
-	pid->output = pid->kp * error + pid->ki * pid->intergral + pid->kd*pid->derivative;
-	
 	//输出限幅
 	if( pid->output > pid->LimitOutputMax ) 
 	{
 		pid->output = pid->LimitOutputMax;
-		if( error>0 ) pid->intergral *= 0.9f; // 轻微减少积分项，防止累积过多
+//		if( error>0 ) pid->intergral *= 0.9f; // 轻微减少积分项，防止累积过多
 	}
 	if( pid->output < pid->LimitOutputMin ) 
 	{
 		pid->output = pid->LimitOutputMin;
-		if( error<0 ) pid->intergral *= 0.9f; // 轻微减少积分项，防止累积过多
+//		if( error<0 ) pid->intergral *= 0.9f; // 轻微减少积分项，防止累积过多
 	}
 	
 	//积分限幅
 	if( pid->intergral>pid->LimitIntegralMax ) pid->intergral = pid->LimitIntegralMax;
 	if( pid->intergral<pid->LimitIntegralMin ) pid->intergral = pid->LimitIntegralMin;
 	
-}
-
-//增量式PID
-void PIDIncremental_Update(PIDIncrementalType_t* pid,float target,float current)
-{
-	float error = target - current;
-	pid->output += pid->kp*(error-pid->prev_error) + pid->ki*pid->prev_error;
+	//pid输出
+	pid->output = pid->kp * error + pid->ki * pid->intergral + pid->kd*pid->derivative;
 	
-	if( pid->output > pid->LimitOutputMax ) pid->output = pid->LimitOutputMax;
-	if( pid->output < pid->LimitOutputMin ) pid->output = pid->LimitOutputMin;
-	
-	pid->prev_error = error;
 }
 
 //角速度环roll
 PIDControllerType_t RollRatePID = {
 	.kp = 85.0f,
-	.ki = 0.2f,
-	.kd = 0.5f,
+	.ki = 0.0f,
+	.kd = 0.0f,
 	.LimitIntegralMax = 3.5f,   //积分限幅,200°/s
 	.LimitIntegralMin = -3.5f, 
 	.LimitOutputMax = 700.0f,   //角速度环输出为油门值
@@ -152,8 +69,8 @@ PIDControllerType_t RollRatePID = {
 //角速度环pitch
 PIDControllerType_t PitchRatePID = {
 	.kp = 85.0f,
-	.ki = 0.2f,
-	.kd = 0.5f,
+	.ki = 0.0f,
+	.kd = 0.0f,
 	.LimitIntegralMax = 3.5f,   //积分限幅,200°/s
 	.LimitIntegralMin = -3.5f, 
 	.LimitOutputMax = 700.0f,   //角速度环输出为油门值
@@ -168,7 +85,7 @@ PIDControllerType_t PitchRatePID = {
 
 //角度环roll
 PIDControllerType_t RollPID = {
-	.kp = 6.0f,
+	.kp = 4.2f,
 	.ki = 0.0f,
 	.kd = 0.0f,
 	.LimitIntegralMax = 0.52f,
@@ -185,7 +102,7 @@ PIDControllerType_t RollPID = {
 
 //角度环pitch
 PIDControllerType_t PitchPID = {
-	.kp = 6.0f,
+	.kp = 4.2f,
 	.ki = 0.0f,
 	.kd = 0.0f,
 	.LimitIntegralMax = 0.52f,
@@ -203,8 +120,8 @@ PIDControllerType_t PitchPID = {
 //角速度环yaw
 PIDControllerType_t YawRatePID = {
 	.kp = 200.0f,
-	.ki = 1.0f,
-	.kd = 10.0f,
+	.ki = 0.0f,
+	.kd = 0.0f,
 	.LimitIntegralMax = 1.04f,   //积分限幅,60°/s
 	.LimitIntegralMin = -1.04f, 
 	.LimitOutputMax = 500,
@@ -221,11 +138,11 @@ PIDControllerType_t YawRatePID = {
 PIDControllerType_t YawPID = {
 	.kp = 6.0f,
 	.ki = 0.0f,
-	.kd = 1.5f,
+	.kd = 0.0f,
 	.LimitIntegralMax = 0.52f,
 	.LimitIntegralMin = -0.52f,    //积分限制,30°
-	.LimitOutputMax = 1.7f,      //角速度输出,最大为 100°/s
-	.LimitOutputMin = -1.7f,
+	.LimitOutputMax = 3.7f,      //角速度输出,最大为 100°/s
+	.LimitOutputMin = -3.7f,
 	.IntegralThreshold = 0.2f ,  //10°积分生效生效
 	.alpha = 1.0f,
 	.prev_error = 0,
@@ -234,6 +151,38 @@ PIDControllerType_t YawPID = {
 	.output = 0
 };
 
+//PIDControllerType_t HeightSpeedPID = {
+//	.kp = 60.0f,
+//	.ki = 0.02f,
+//	.kd = 80.0f,
+//	.LimitIntegralMax = 100.0f,
+//	.LimitIntegralMin = -100.0f,
+//	.LimitOutputMax = 500,
+//	.LimitOutputMin = -500,
+//	.IntegralThreshold = 20 ,
+//	.alpha = 0.4,
+//	.prev_error = 0,
+//	.intergral = 0,
+//	.derivative = 0,
+//	.output = 0
+//};
+
+
+//PIDControllerType_t HeightPID = {
+//	.kp = 5.5f,
+//	.ki = 0.0f,
+//	.kd = 0.5f,
+//	.LimitIntegralMax = 10,
+//	.LimitIntegralMin = -10,
+//	.LimitOutputMax = 1.0f,
+//	.LimitOutputMin = -1.0f,
+//	.IntegralThreshold = 10 ,
+//	.alpha = 1.0f,
+//	.prev_error = 0,
+//	.intergral = 0,
+//	.derivative = 0,
+//	.output = 0
+//};
 
 PIDControllerType_t HeightSpeedPID = {
 	.kp = 60.0f,
@@ -241,8 +190,8 @@ PIDControllerType_t HeightSpeedPID = {
 	.kd = 80.0f,
 	.LimitIntegralMax = 100.0f,
 	.LimitIntegralMin = -100.0f,
-	.LimitOutputMax = 1000,
-	.LimitOutputMin = -1000,
+	.LimitOutputMax = 500,
+	.LimitOutputMin = -500,
 	.IntegralThreshold = 20 ,
 	.alpha = 0.4,
 	.prev_error = 0,
@@ -253,7 +202,7 @@ PIDControllerType_t HeightSpeedPID = {
 
 
 PIDControllerType_t HeightPID = {
-	.kp = 5.5f,
+	.kp = 3.5f,
 	.ki = 0.0f,
 	.kd = 0.5f,
 	.LimitIntegralMax = 10,
@@ -267,3 +216,4 @@ PIDControllerType_t HeightPID = {
 	.derivative = 0,
 	.output = 0
 };
+

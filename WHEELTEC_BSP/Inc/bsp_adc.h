@@ -5,6 +5,7 @@
 
 //ADC存放在缓冲区的索引值
 #define userconfigADC_VBAT_CHANNEL  0
+#define userconfigADC_Curr_CHANNEL  1
 
 typedef struct {
 	void (*init)(void);

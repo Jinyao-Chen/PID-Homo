@@ -1,0 +1,15 @@
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/queue.c
+wheeltec\queue.o: C:\Keil_v5\ARM\ARM_Compiler_5.06u7\Bin\..\include\stdlib.h
+wheeltec\queue.o: C:\Keil_v5\ARM\ARM_Compiler_5.06u7\Bin\..\include\string.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
+wheeltec\queue.o: C:\Keil_v5\ARM\ARM_Compiler_5.06u7\Bin\..\include\stddef.h
+wheeltec\queue.o: C:\Keil_v5\ARM\ARM_Compiler_5.06u7\Bin\..\include\stdint.h
+wheeltec\queue.o: ../Core/Inc/FreeRTOSConfig.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
+wheeltec\queue.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h

@@ -30,12 +30,14 @@ static char page3_paramshow[1024];  //APP参数页面数据
 
 APPShowType_t appshow = { 0 }; //显示内容存储变量
 
+extern uint8_t g_lost_pos_dev;
+
 void ShowTask(void* param)
 {
 	pADCInterface_t adc1 = &UserADC1;
 	
 	//蓝牙对应串口3
-	UART_HandleTypeDef* serial = &huart3; 
+	UART_HandleTypeDef* serial = &huart4; 
 
 	//实现APP数据分时显示
 	uint8_t appshowNum = 0;
@@ -43,8 +45,13 @@ void ShowTask(void* param)
 
 	float VOL_percen = 0;//电量百分比
 	
+	float cur_all = 0;
+	
 	while (1)
 	{
+		//电调总电流监测
+		cur_all = (float)adc1->getValue(userconfigADC_Curr_CHANNEL)/4096.0f * 3.3f / 0.2f;
+		
 		//电量计算
 		VOL_percen = (g_robotVOL-10.0f) / (12.6f - 10.0f) * 100;
 		if( VOL_percen < 0 ) VOL_percen = 0;
@@ -67,7 +74,7 @@ void ShowTask(void* param)
 			appshowNum = 0;
 
 			/* 参数页面显示 */
-			sprintf(page3_paramshow,"{C%d:%d:%d}$",(int)0,(int)0,(int)0); 
+			sprintf(page3_paramshow,"{C%d:%d:%d}$",(int)(cur_all*1000),(int)(g_robotVOL*1000),(int)g_lost_pos_dev); 
 
 			NeedShowBuf = page3_paramshow;
 		}

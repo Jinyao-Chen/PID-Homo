@@ -1,0 +1,16 @@
+wheeltec\sensorhandle_task.o: ..\WHEELTEC_APP\sensorhandle_task.c
+wheeltec\sensorhandle_task.o: C:\Keil_v5\ARM\ARM_Compiler_5.06u7\Bin\..\include\stdio.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
+wheeltec\sensorhandle_task.o: C:\Keil_v5\ARM\ARM_Compiler_5.06u7\Bin\..\include\stddef.h
+wheeltec\sensorhandle_task.o: C:\Keil_v5\ARM\ARM_Compiler_5.06u7\Bin\..\include\stdint.h
+wheeltec\sensorhandle_task.o: ../Core/Inc/FreeRTOSConfig.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
+wheeltec\sensorhandle_task.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h
+wheeltec\sensorhandle_task.o: ../WHEELTEC_BSP/Inc/bsp_stp23L.h
+wheeltec\sensorhandle_task.o: ../WHEELTEC_BSP/Inc/bsp_N10.h

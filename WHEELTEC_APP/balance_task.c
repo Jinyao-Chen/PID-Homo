@@ -11,9 +11,6 @@
 #include "task.h"
 #include "event_groups.h"
 
-/* HAL */
-#include "tim.h"
-
 /* BSP */
 #include "bsp_led.h"
 #include "bsp_buzzer.h"
@@ -24,6 +21,7 @@
 #include "bsp_imu.h"
 #include "bsp_stp23L.h"
 #include "bsp_adc.h"
+#include "main.h"
 
 #include "show_task.h"
 #include "pid.h"
@@ -98,7 +96,7 @@ static float userset_roll = 0;
 static uint8_t controlCmdNumber = IDLECmd;
 
 //起飞电压限制
-#define ROBOT_VOL_LIMIT 10.8f
+#define ROBOT_VOL_LIMIT 10.0f
 
 //定高模式,最大与最小高度设置
 #define HeightMode_MAX 1.5f
@@ -113,9 +111,82 @@ extern PIDControllerType_t RollRatePID,RollPID;
 extern PIDControllerType_t PitchRatePID,PitchPID;
 extern PIDControllerType_t YawRatePID,YawPID;
 extern PIDControllerType_t HeightSpeedPID,HeightPID;
+
 extern void PID_Update(PIDControllerType_t* pid,float target,float current);
 extern void PID_Reset(PIDControllerType_t* pid);
 
+extern uint8_t g_lost_pos_dev;
+
+//Z轴角度归一化处理
+#define M_PI 3.14159265f
+static float normalize_radian(float angle) {
+	const float TWO_PI = 2.0f * M_PI; // 2π ≈ 6.283185307
+	while (angle > M_PI) {
+		angle -= TWO_PI;
+	}
+	while (angle < -M_PI) {
+		angle += TWO_PI;
+	}
+	return angle;
+}
+
+//实际使用的高度值
+float use_distance = 0;
+
+/* 定义滤波后的角速度 */
+float gx_filtered = 0, gy_filtered = 0; 
+
+//光流速度、位置、目标位置
+float speedX=0,speedY=0;
+float posX=0,posY=0;
+float targetPosX=0,targetPosY=0;
+
+//定点功能开启标志位
+uint8_t startPos = 1;
+
+// 速度(数据融合后的)
+static float x_dot = 0, y_dot = 0; 
+
+
+// 光流数据回调函数
+void getOpticalFlowResult_Callback(float* buf)
+{
+	speedY = -buf[0] / 200.0f; // 速度(m/s)
+	speedX = -buf[1] / 200.0f; // 速度(m/s)
+	
+	speedY = use_distance * (speedY - fmaxf(fminf(gx_filtered,2.0f),-2.0f)); // 旋转补偿 + 尺度缩放
+	speedX = use_distance * (speedX + fmaxf(fminf(gy_filtered,2.0f),-2.0f)); // 旋转补偿 + 尺度缩放
+	
+	g_lost_pos_dev=0;
+}
+
+//步进调整位置
+void set_targetpos_lc307(uint8_t flag)
+{
+	xTimerStart(priv_OperateResponseTimer,0);
+	switch( flag )
+	{
+		case 0:
+			targetPosX += 0.2f;//B
+			break;
+		case 1:
+			targetPosX -= 0.2f;//X
+			break;
+		case 2:
+			targetPosY += 0.2f;//Y
+			break;
+		case 3:
+			targetPosY -= 0.2f;//A
+			break;
+		default:
+			break;
+	}
+}
+
+void start_lc307_pos(void)
+{
+	startPos = !startPos;
+}
 
 void balance_task(void* param)
 {
@@ -132,11 +203,11 @@ void balance_task(void* param)
 	pRtosDebugInterface_t debug = &RTOSTaskDebug;
 	RtosDebugPrivateVar debugPriv = { 0 };
 	
-	//ADC驱动
-	pADCInterface_t adc1 = &UserADC1;
-	
 	//指定用到的驱动
 	pIMUInterface_t imu = &UserICM20948;
+	
+	//ADC驱动
+	pADCInterface_t adc1 = &UserADC1;
 	
 	//IMU零点,系统启动时、四轴起飞时,执行标定
 	IMU_ZEROPONIT_t* zero_point = { NULL };
@@ -163,9 +234,6 @@ void balance_task(void* param)
 	//高度零点
 	float zero_distance = 0;
 	
-	//实际使用的高度值
-	float use_distance = 0;
-	
 	//启动飞机时零点标定标志位
 	uint8_t StarFly_UpdateFlag = 1;
 	
@@ -186,6 +254,10 @@ void balance_task(void* param)
 		use_distance = zero_distance - g_readonly_distance;
 		
 		imu->Update_9axisVal(&axis_9Val);           //陀螺仪数据更新,获取的数据均为原始数据.此操作耗时 0.61 ms
+		
+		gx_filtered = 0.9f * gx_filtered + 0.1f * axis_9Val.gyro.x; /* 一阶低通滤波 */
+		gy_filtered = 0.9f * gy_filtered + 0.1f * axis_9Val.gyro.y; /* 一阶低通滤波 */
+		
 		imu->UpdateAttitude(axis_9Val,&AttitudeVal);//更新姿态角
 		
 		//电压获取
@@ -219,7 +291,6 @@ void balance_task(void* param)
 				{
 					imu->UpdateZeroPoint_attitude(zero_point->attitude);           //imu姿态零点更新
 					zero_distance = g_readonly_distance;                           //高度零点更新
-					
 					xTimerChangePeriod(priv_WaitImuTipsTimer,pdMS_TO_TICKS(800),0);//系统进入正常状态,LED慢闪提示
 					xEventGroupSetBits(g_xEventFlyAction,IMU_CalibZeroDone_Event); //设置事件,IMU标定完成
 					
@@ -230,7 +301,10 @@ void balance_task(void* param)
 						xTimerStart(priv_UNUSEHeightTimer,0);
 					}
 					else /* 正常模式 */
+					{
 						xTimerStart(priv_BuzzerTipsTimer,0); //蜂鸣器提示标定已完成
+					}
+						
 					
 					/* 控制方式,默认有头模式 */
 					//xEventGroupSetBits(g_xEventFlyAction,FlyMode_HeadLessMode_Event);
@@ -250,6 +324,7 @@ void balance_task(void* param)
 		{   /* 不定高模式 */
 			use_distance = FlyControl_height; 
 			height_dot = 0;
+			startPos=0;
 		}
 		/* 高度信息处理 END*/
 		
@@ -271,10 +346,9 @@ void balance_task(void* param)
 				FlyControl_pitch =  controlVal.pitch;
 				FlyControl_roll =  controlVal.roll;
 			}
-			FlyControl_gyroz = controlVal.gyroz;
 			
-			//在对Z轴执行控制时,放弃Z轴角度反馈量.在控制完毕后,由以最后一次控制的角度为目标值反馈
-			if( FlyControl_gyroz!=0 ) FlyControl_yaw = AttitudeVal.yaw;
+			//Z轴控制量为累计值
+			FlyControl_yaw -= controlVal.gyroz;
 			
 			//检查是否允许高度控制(低电量时不允许升高操作)
 			if( (uxBits & LowPower_Event) && controlVal.height > 0 )
@@ -320,7 +394,7 @@ void balance_task(void* param)
 		
 		/* 低电量检测与处理 */
 		static uint32_t lowVOLcount = 0;
-		if( (uxBits & StartFly_Event) && g_robotVOL < 10.0f )
+		if( (uxBits & StartFly_Event) && g_robotVOL < 9.5f )
 		{
 			lowVOLcount++;
 			if( 2*TaskFreq == lowVOLcount ) //连续2秒电量低于10V
@@ -368,8 +442,13 @@ void balance_task(void* param)
 				zero_point->attitude->yaw += AttitudeVal.yaw;
 				imu->UpdateZeroPoint_attitude(zero_point->attitude);
 				
+				//光流位置
+				targetPosX = posX;
+				targetPosY = posY;
+				
 				/* 在启动位置,将所有控制量复位 */
 				FlyControl_pitch = 0; FlyControl_roll = 0; FlyControl_gyroz = 0;
+				FlyControl_yaw = AttitudeVal.yaw;
 				FlyControl_unuseHeight = 0.0f;
 				
 				//PID控制器清空累计值
@@ -381,7 +460,6 @@ void balance_task(void* param)
 				PID_Reset(&YawRatePID);
 				PID_Reset(&HeightPID);
 				PID_Reset(&HeightSpeedPID);
-				
 				//标零后跳过本次数据
 				continue;
 			}
@@ -390,7 +468,7 @@ void balance_task(void* param)
 			if( 1 == StartFly_SmoothHeightFlag )
 			{
 				if( FlyControl_height < DefalutHeight ) FlyControl_height += 0.0025f;
-				else StartFly_SmoothHeightFlag = 0;
+				else StartFly_SmoothHeightFlag = 0,startPos=1;
 			}
 			
 			//平衡状态下微调功能(非累加,AttitudeVal实时更新)
@@ -398,19 +476,85 @@ void balance_task(void* param)
 			AttitudeVal.roll += userset_roll;
 			
 			/* 核心算法部分... */
+			
+			///////////////////// 光流数据处理 ///////////////////////////////////
+			static float x_dot_Prev = 0, y_dot_Prev = 0; // 上一次的速度值
+			
+			// 计算重力分量
+			float g = 9.8f;
+			float g_x = -g * sin(AttitudeVal.pitch);
+			float g_y =  g * sin(AttitudeVal.roll) * cos(AttitudeVal.pitch);
+			float g_z =  g * cos(AttitudeVal.roll) * cos(AttitudeVal.pitch);
+
+			// 计算运动加速度(机体坐标系)
+			float a_x = axis_9Val.accel.x - g_x;
+			float a_y = axis_9Val.accel.y - g_y;
+			float a_z = axis_9Val.accel.z - g_z;
+
+			// 坐标变换(机体坐标系 --> 世界坐标系)
+			float a_motion_x = a_x * cos(AttitudeVal.pitch) + 
+					   a_y * sin(AttitudeVal.roll) * sin(AttitudeVal.pitch) + 
+							 a_z * cos(AttitudeVal.roll) * sin(AttitudeVal.pitch);
+			float a_motion_y = a_y * cos(AttitudeVal.roll) - 
+						   a_z * sin(AttitudeVal.roll);
+			
+			if( fabs(a_motion_x)<0.15f ) a_motion_x=0;
+			if( fabs(a_motion_y)<0.15f ) a_motion_y=0;
+			
+			// 互补滤波
+			x_dot = 0.95f * (x_dot + a_motion_x * 0.005f) + 0.05f * speedX; // 单位：m/s
+			y_dot = 0.95f * (y_dot + a_motion_y * 0.005f) + 0.05f * speedY; // 单位：m/s
+
+			// 使用梯形积分法计算位移
+			posX += (x_dot + x_dot_Prev) * 0.5f * 0.005f; // 单位：m
+			posY += (y_dot + y_dot_Prev) * 0.5f * 0.005f; // 单位：m
+
+			// 积分限幅
+			posX = fmaxf(fminf(posX, 5.0f), -5.0f);
+			posY = fmaxf(fminf(posY, 5.0f), -5.0f);
+			
+			x_dot_Prev = x_dot;
+			y_dot_Prev = y_dot;
+			///////////////////// 光流数据处理 END ///////////////////////////////////
+			
+			//位置PD计算
+			const float limitPos = 0.35f;
+			float controlX = 0.5f * (targetPosX - posX) - 0.7f * x_dot;//前后
+			float controlY = 0.5f * (targetPosY - posY) - 0.7f * y_dot;//左右
+			
+			if( controlX > limitPos ) controlX = limitPos;
+			if( controlX <-limitPos ) controlX = -limitPos;
+			if( controlY > limitPos ) controlY = limitPos;
+			if( controlY <-limitPos ) controlY = -limitPos;
+			
+			//存在控制量、光流设备不存在或定位功能未开启，忽略光流的数据信息
+			if( FlyControl_pitch!=0 || FlyControl_roll!=0 || controlVal.height!=0 || startPos==0 || g_lost_pos_dev == 1 )
+			{
+				posX=0;posY=0;
+				speedX=0;speedY=0;
+				x_dot=0;y_dot=0;
+				x_dot_Prev=0;y_dot_Prev=0;
+				controlX=0;controlY=0;
+				targetPosX=0;targetPosY=0;
+			}
+						
 			//角度---外环3轴控制
-			PID_Update(&RollPID,-FlyControl_roll,AttitudeVal.roll);
-			PID_Update(&PitchPID,-FlyControl_pitch,AttitudeVal.pitch);
-			PID_Update(&YawPID,FlyControl_yaw,AttitudeVal.yaw);
+			PID_Update(&RollPID,-FlyControl_roll - controlY,AttitudeVal.roll);
+			PID_Update(&PitchPID,-FlyControl_pitch + controlX,AttitudeVal.pitch);
+			
+			//偏航角控制,需要对角度进行归一化处理
+			float yaw_error = normalize_radian(FlyControl_yaw - AttitudeVal.yaw);
+			PID_Update(&YawPID,yaw_error,0);
+			
 			PID_Update(&HeightPID,FlyControl_height,use_distance);
 			
 			//角速度---内环3轴控制
 			PID_Update(&RollRatePID,RollPID.output,axis_9Val.gyro.x);
 			PID_Update(&PitchRatePID,PitchPID.output,axis_9Val.gyro.y);
-			PID_Update(&YawRatePID,YawPID.output + (-FlyControl_gyroz) ,axis_9Val.gyro.z);
+			PID_Update(&YawRatePID,YawPID.output,axis_9Val.gyro.z);
 			PID_Update(&HeightSpeedPID,HeightPID.output,height_dot);
 			
-			uint16_t base_throttle = weight_to_throttle((140.0f+FlyControl_unuseHeight*100.0f),use_distance); //基础油门值
+			uint16_t base_throttle = weight_to_throttle((145.0f+0+FlyControl_unuseHeight*100.0f),use_distance); //基础油门值
 			motor.A.throttle = base_throttle - RollRatePID.output - PitchRatePID.output + YawRatePID.output + HeightSpeedPID.output;
 			motor.B.throttle = base_throttle + RollRatePID.output - PitchRatePID.output - YawRatePID.output + HeightSpeedPID.output;
 			motor.C.throttle = base_throttle + RollRatePID.output + PitchRatePID.output + YawRatePID.output + HeightSpeedPID.output;
@@ -445,23 +589,30 @@ void balance_task(void* param)
 		
 		/* 拷贝部分重要变量到APP进行显示,与控制无关 */
 		extern APPShowType_t appshow;
-		appshow.m1 = motor.A.throttle;
-		appshow.m2 = motor.B.throttle;
-		appshow.m3 = motor.C.throttle;
-		appshow.m4 = motor.D.throttle;
 		appshow.pitch = AttitudeVal.pitch;
 		appshow.roll = AttitudeVal.roll;
 		appshow.yaw = AttitudeVal.yaw;
 		appshow.gyrox = axis_9Val.gyro.x;
 		appshow.gyroy = axis_9Val.gyro.y;
 		appshow.gyroz = axis_9Val.gyro.z;
+		appshow.accelx = axis_9Val.accel.x;
+		appshow.accely = axis_9Val.accel.y;
+		appshow.accelz = axis_9Val.accel.z;
 		appshow.balanceTaskFreq = g_readonly_BalanceTaskFreq;
 		appshow.height = use_distance;
 		appshow.c_pitch = FlyControl_pitch;
 		appshow.c_roll = FlyControl_roll;
 		appshow.c_yaw = FlyControl_gyroz;
 		appshow.c_height = FlyControl_height;
-		
+		appshow.zero_roll = userset_roll;
+		appshow.zero_pitch = userset_pitch;
+		appshow.posx = posX;
+		appshow.posy = posY;
+		appshow.targetX = targetPosX;
+		appshow.targetY = targetPosY;
+		appshow.speedx = x_dot;
+		appshow.speedy = y_dot;
+
 		/* 延迟指定频率 */
 		vTaskDelayUntil(&preTime,pdMS_TO_TICKS( (1.0f/(float)TaskFreq)*1000) );
 	}
@@ -668,9 +819,9 @@ static IMU_ZEROPONIT_t* WaitImuStable(uint16_t freq,IMU_DATA_t NowImu,ATTITUDE_D
 			if( fabs(NowImu.gyro.x - LastImuData.gyro.x) < 0.01f ) state++;
 			if( fabs(NowImu.gyro.y - LastImuData.gyro.y) < 0.01f ) state++;
 			if( fabs(NowImu.gyro.z - LastImuData.gyro.z) < 0.01f ) state++;
-			if( fabs(NowImu.accel.x - LastImuData.accel.x) < 0.02f ) state++;
-			if( fabs(NowImu.accel.y - LastImuData.accel.y) < 0.02f ) state++;
-			if( fabs(NowImu.accel.z - LastImuData.accel.z) < 0.02f ) state++;
+			if( fabs(NowImu.accel.x - LastImuData.accel.x) < 0.03f ) state++;
+			if( fabs(NowImu.accel.y - LastImuData.accel.y) < 0.03f ) state++;
+			if( fabs(NowImu.accel.z - LastImuData.accel.z) < 0.03f ) state++;
 			
 			if( state==6 )  
 			{
@@ -696,7 +847,7 @@ static IMU_ZEROPONIT_t* WaitImuStable(uint16_t freq,IMU_DATA_t NowImu,ATTITUDE_D
 					ZeroPoint.accel.y/=calibratetimes;
 					ZeroPoint.accel.z/=calibratetimes;
 					
-					//ZeroPoint.accel.z-=9.8f;
+					ZeroPoint.accel.z-=9.8f;
 					res_p.axis = &ZeroPoint;
 					
 					//输出标定结果：
@@ -828,7 +979,7 @@ static void StopVal_SelfRecovery(MOTOR_t* m)
 //重量转为油门值,入口参数单位克g
 static uint16_t weight_to_throttle(float weight,float height)
 {
-	weight = weight + height*14.0f;
+//	weight = weight + height*14.0f;
 	
     return 1537.96f + 8.70f*weight - 225.2f*g_robotVOL - 0.0088f*weight*weight - 0.24f*weight*g_robotVOL + 9.01f*g_robotVOL*g_robotVOL;
 }
